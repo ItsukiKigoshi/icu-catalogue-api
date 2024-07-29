@@ -14,7 +14,7 @@ import time
 
 
 class User(BaseModel):
-    username: str = Field(..., title="Username", max_length=100)
+    username: str = Field(..., title="Username", max_length=100) # // change to icu email (xxx@icu.ac.jp)
     password_hash: str = Field(..., title="Password Hash", max_length=64)
     log: str = Field(..., title="User Log")
 
@@ -56,7 +56,7 @@ def upload_to_storage(file: UploadFile, username: str):
 
 def delete_old_files():
     now = time.time()
-    cutoff = now - (365 * 86400)  # 1 year ago timestamp
+    cutoff = now - (365 * 86400)  # 1 year ago timestamp # // might change to 4 years, based on the storage
     blobs = bucket.list_blobs()
     for blob in blobs:
         created_at = float(blob.metadata.get("created_at", "0"))
