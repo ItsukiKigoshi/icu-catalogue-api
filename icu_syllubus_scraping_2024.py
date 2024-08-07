@@ -127,7 +127,7 @@ current_page = 1
 
 # Loop to click the "next page" button and scrape data from all pages
 while True:
-    if click_next_page(current_page): 
+    if click_next_page(current_page): # for test and play around, please please add the following before colon: and current_page < 5 
         time.sleep(2)  # Adjust the wait time as needed
         current_page += 1
 
