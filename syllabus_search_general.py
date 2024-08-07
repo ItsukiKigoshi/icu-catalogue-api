@@ -1,4 +1,4 @@
-# seach for name_e, response for all course_info
+# seach for name_e, response for course_id and english course name
 from fastapi import FastAPI, Query, Depends
 from sqlalchemy import create_engine, Column, Integer, String, select
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
@@ -48,7 +48,7 @@ def search_courses(q: Optional[str] = Query(None, min_length=1), db: Session = D
         results = db.execute(select(Course).where(Course.name_e.ilike(f"%{q}%"))).scalars().all()
     else:
         results = db.execute(select(Course)).scalars().all()
-    return [{"id": course.id, "name_e": course.name_e, "registration_no": course.registration_no} for course in results]
+    return [{"course_id": course.course_no, "name_e": course.name_e, } for course in results]
 
 # Run the application with: uvicorn syllabus_search:app --reload
 # Access the search endpoint at: http://127.0.0.1:8000/search?q=keyword
