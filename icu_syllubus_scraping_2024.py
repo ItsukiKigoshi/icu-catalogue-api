@@ -7,7 +7,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
 from bs4 import BeautifulSoup
 import time
-import json
+import sqlite3
 
 # Initialize Selenium
 chrome_driver_path = "/opt/homebrew/Caskroom/chromedriver/..."  # replace it with your own chromedriver absolute path
@@ -59,12 +59,42 @@ def extract_courses(page_soup):
                 skip_next_tr = False
                 continue
             else:
-                cols = row.find_all('td')  # bs4.element.ResultSet
-                if cols:  # Only process if there are td elements (the format of the title row of the sybllubus consists <th>s for the content intead of <tr>s)
-                    course = [col.text.strip() for col in cols if col.text.strip()]  # Extract and clean text
-                    print(course)
-                    courses.append(course)
+                cols = row.find_all('td')  # type: bs4.element.ResultSet
+                if cols:  # skip empty cols
+                    course_info = [col.text.strip() for col in cols]  # type: list
+                    first_term = course_info[0].split('\n')
+                    name_term = course_info[4].split('\n')
+                    if len(name_term) == 3:
+                        period = name_term[2]
+                        room = "NULL"
+                    elif len(name_term) == 4:
+                        period = name_term[2]
+                        room = name_term[3]
+                    else:
+                        period = "NULL"
+                        room = "NULL"
+
+                    registration_no = first_term[0]  # Reg.No
+                    term = first_term[1]  # 2024 default
+                    course_no = course_info[1]
+                    major = course_info[1][:3]
+                    level = course_info[1][3:4]  # 何番台
+                    language = course_info[2]
+                    name_j = name_term[1]
+                    name_e = name_term[0]
+                    instructor = course_info[6]
+
+                    credit_text = course_info[7] # type: str
+                    # Extract number from (credit_text)
+                    if len(credit_text) == 1:
+                        credit = credit_text
+                    else:
+                        credit = credit_text[1]
+
+                    courses.append((registration_no, term, course_no, major, level, language,
+                                        name_j, name_e, period, room, instructor, credit))
     return courses
+
 
 # Create a list to save all course information
 all_courses = []
@@ -111,9 +141,38 @@ while True:
         print("All pages processed")
         break
 
-# Save all course information to a local JSON file (will use SQLite instead for icucatalogue's following data filtering work)
-with open('test.json', 'w', encoding='utf-8') as f:
-    json.dump(all_courses, f, ensure_ascii=False, indent=4)
+# Save all course information to a local SQLite database
+conn = sqlite3.connect('syllabus.db')
+c = conn.cursor()
+
+# Create a table to store the course information
+c.execute('''
+    CREATE TABLE IF NOT EXISTS courses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        registration_no TEXT,
+        term TEXT,
+        course_no TEXT,
+        major TEXT,
+        level TEXT,
+        language TEXT,
+        name_j TEXT,
+        name_e TEXT,
+        period TEXT,
+        room TEXT,
+        instructor TEXT,
+        credit INTEGER
+    )
+''')
+
+# Insert course data into the table
+for course in all_courses:
+    c.execute('INSERT INTO courses (registration_no, term, course_no, major, level, language, '
+              'name_j, name_e, period, room, instructor, credit) '
+              'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', course)
+
+# Commit the changes and close the connection
+conn.commit()
+conn.close()
 
 # Close the browser
 driver.quit()
