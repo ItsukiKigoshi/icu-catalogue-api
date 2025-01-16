@@ -152,7 +152,7 @@ while True:
         break
 
 # Save all course information to a local SQLite database
-conn = sqlite3.connect('syllabus.db')
+conn = sqlite3.connect('course offering.db')
 c = conn.cursor()
 
 # Create a table to store the course information
