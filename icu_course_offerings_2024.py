@@ -1,5 +1,6 @@
-# install selenium, chromedriver, bs4 in advance
-# can use IPython for test
+# pip selenium
+# pip bs4
+# pip chromedriver_autoinstaller
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -8,60 +9,56 @@ from selenium.common.exceptions import NoSuchElementException
 from bs4 import BeautifulSoup
 import time
 import sqlite3
+import chromedriver_autoinstaller
 
-# Initialize Selenium
-chrome_driver_path = "/opt/homebrew/Caskroom/chromedriver/..."  # replace it with your own chromedriver absolute path
-driver = webdriver.Chrome(service=Service(chrome_driver_path))
+# initialize Selenium
+chromedriver_autoinstaller.install()
+driver = webdriver.Chrome()
 
-# Open the course offering page, will jump to gluegent login page by itself
-driver.get('https://campus.icu.ac.jp/icumap/ehb/SearchCO.aspx') # path effective on Aug 7, 2024
+# open login page
+driver.get('https://campus.icu.ac.jp/icumap/ehb/SearchCO.aspx')
 
-# Enter username and password
+# enter username and password
 try:
     username = driver.find_element(By.NAME, 'username')
     password = driver.find_element(By.NAME, 'password')
-    print("Login page loaded successfully")
+    print("successfully loaded login page")
 except NoSuchElementException:
-    print("Failed to load login page")
+    print("failed to load login page")
     driver.quit()
     exit()
 
-# remember to replace these with your own effective icu acount
-username.send_keys('your icu id')  
+username.send_keys('your username')
 password.send_keys('your password')
 
-# Click the login button
+# click "login"
 login_button = driver.find_element(By.ID, 'login_button')
 login_button.click()
+time.sleep(1)
 
-# Wait for the page to load completely
-time.sleep(1)  # Adjust the wait time as needed
-
-# Click the "Search" button
+# click “Search"
 search_button = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_btn_search')
 search_button.click()
+time.sleep(1)
 
-# Wait for the search results to load completely
-time.sleep(1)  # Adjust the wait time as needed
-
-# Define a function to extract course information from the current page
 def extract_courses(page_soup):
     courses = []
     table = page_soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_grv_course'})
     if table:
         rows = table.find_all('tr')
-        skip_next_tr = False # flag for the recognization of the page number tr lines (2 tr lines for icu course offering webpage case)
+        skip_next_tr = False
         for row in rows:
-            if row.get('align') == 'center':  # the first line has align = 'center' while all of other wanted tr lines do not.
+            if row.get('align') == 'center':
                 skip_next_tr = True
                 continue
-            elif skip_next_tr: # The second line is in the table nested under the first line. No align label recognizable, so used "skip_next_tr" flag instead.
+            elif skip_next_tr:
                 skip_next_tr = False
                 continue
             else:
-                cols = row.find_all('td')  # type: bs4.element.ResultSet
+                cols = row.find_all('td')  # bs4.element.ResultSet
                 if cols:  # skip empty cols
-                    course_info = [col.text.strip() for col in cols]  # type: list
+                    status = 0 if any(col.find('div', {'class': 'word_line_through'}) for col in cols) else 1 # deleted:0, normal:1
+                    course_info = [col.text.strip() for col in cols]  # list
                     first_term = course_info[0].split('\n')
                     name_term = course_info[4].split('\n')
                     if len(name_term) == 3:
@@ -73,7 +70,6 @@ def extract_courses(page_soup):
                     else:
                         period = "NULL"
                         room = "NULL"
-
                     registration_no = first_term[0]  # Reg.No
                     term = first_term[1]  # 2024 default
                     course_no = course_info[1]
@@ -83,26 +79,25 @@ def extract_courses(page_soup):
                     name_j = name_term[1]
                     name_e = name_term[0]
                     instructor = course_info[6]
+                    credit_text = course_info[7]
 
-                    credit_text = course_info[7] # type: str
                     # Extract number from (credit_text)
                     if len(credit_text) == 1:
                         credit = credit_text
+                    elif credit_text[0] == "1":  # when credit == 1/3, data type stored in db is text
+                        credit = credit_text
+                    elif credit_text[0] == "3": # 卒論研究3/(9)
+                        credit = credit_text[0]
                     else:
                         credit = credit_text[1]
 
-                    courses.append((registration_no, term, course_no, major, level, language,
+                    courses.append((status, registration_no, term, course_no, major, level, language,
                                         name_j, name_e, period, room, instructor, credit))
     return courses
 
-
-# Create a list to save all course information
-all_courses = []
-
-# Function to get and click the next page button
 def click_next_page(current_page):
     soup = BeautifulSoup(driver.page_source, 'html.parser')
-    pagination_row = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_grv_course'}).find_all('tr')[0]  # Find the row containing page numbers
+    pagination_row = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_grv_course'}).find_all('tr')[0]  # 找到包含页码的行
     if not pagination_row:
         print("Pagination row not found")
         return False
@@ -115,30 +110,45 @@ def click_next_page(current_page):
                 next_page_button = driver.find_element(By.LINK_TEXT, str(page_number))
                 next_page_button.click()
                 return True
+        elif link.text.strip() == "...":
+            if current_page % 10 == 0:
+                next_page_button = driver.find_elements(By.LINK_TEXT, "...")[-1]
+                # if current_page // 10 > 1:
+                    # next_page_button = next_page_button[-1]
+                next_page_button.click()
+                return True
     return False
 
-# Extract course information from the first page
+
+# scratch the first page
+all_courses = []
 html = driver.page_source
 soup = BeautifulSoup(html, 'html.parser')
-all_courses.extend(extract_courses(soup))
+first_page = extract_courses(soup)
+# print(first_page)
+all_courses.extend(first_page)
 
-# Initialize the current page number
+# initialize current_page number
 current_page = 1
 
-# Loop to click the "next page" button and scrape data from all pages
+# scratch all the pages
 while True:
-    if click_next_page(current_page): # for test and play around, please please add the following before colon: and current_page < 5 
-        time.sleep(2)  # Adjust the wait time as needed
+    if click_next_page(current_page):
+        time.sleep(2)  # adjust depending on needs
         current_page += 1
-
-        # Extract course information from the current page
         html = driver.page_source
         soup = BeautifulSoup(html, 'html.parser')
         page_courses = extract_courses(soup)
-        print(page_courses)
+        if len(page_courses) == 0:
+            raise Exception("Not able to load the page. Please increase sleep time or check your internet connection.")
+        except Exception as e:
+            print(f"Error: {e}")
+            print(f"Page{current_page} failed")
+        # print(page_courses)
+        print(f"Page{current_page} completed")
         all_courses.extend(page_courses)
     else:
-        print("All pages processed")
+        print("All pages completed")
         break
 
 # Save all course information to a local SQLite database
@@ -149,6 +159,7 @@ c = conn.cursor()
 c.execute('''
     CREATE TABLE IF NOT EXISTS courses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        status INTEGER,
         registration_no TEXT,
         term TEXT,
         course_no TEXT,
@@ -166,13 +177,14 @@ c.execute('''
 
 # Insert course data into the table
 for course in all_courses:
-    c.execute('INSERT INTO courses (registration_no, term, course_no, major, level, language, '
+    c.execute('INSERT INTO courses (status, registration_no, term, course_no, major, level, language, '
               'name_j, name_e, period, room, instructor, credit) '
-              'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', course)
+              'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', course)
 
 # Commit the changes and close the connection
 conn.commit()
 conn.close()
+print("Database updated.")
 
-# Close the browser
+# close chrome driver
 driver.quit()
