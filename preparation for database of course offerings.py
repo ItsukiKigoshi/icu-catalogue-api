@@ -28,8 +28,8 @@ except NoSuchElementException:
     driver.quit()
     exit()
 
-username.send_keys('c271530i')
-password.send_keys('BilBao0508')
+username.send_keys('your username')
+password.send_keys('your password')
 
 # click "login"
 login_button = driver.find_element(By.ID, 'login_button')
