@@ -28,8 +28,8 @@ except NoSuchElementException:
     driver.quit()
     exit()
 
-username.send_keys('your username')
-password.send_keys('your password')
+username.send_keys('c271530i')
+password.send_keys('BilBao0508')
 
 # click "login"
 login_button = driver.find_element(By.ID, 'login_button')
@@ -57,7 +57,8 @@ def extract_courses(page_soup):
             else:
                 cols = row.find_all('td')  # bs4.element.ResultSet
                 if cols:  # skip empty cols
-                    status = 0 if any(col.find('div', {'class': 'word_line_through'}) for col in cols) else 1 # deleted:0, normal:1
+                    # status: deleted:0, normal:1, added
+                    status = 0 if any(col.find('div', {'class': 'word_line_through'}) for col in cols) else 1
                     course_info = [col.text.strip() for col in cols]  # list
                     first_term = course_info[0].split('\n')
                     name_term = course_info[4].split('\n')
@@ -70,11 +71,12 @@ def extract_courses(page_soup):
                     else:
                         period = "NULL"
                         room = "NULL"
-                    registration_no = first_term[0]  # Reg.No
-                    term = first_term[1]  # 2024 default
+                    registration_no = first_term[0]
+                    term = first_term[1]
+                    academic_year = first_term [2]
                     course_no = course_info[1]
                     major = course_info[1][:3]
-                    level = course_info[1][3:4]  # 何番台
+                    level = course_info[1][3:4]  # 何番台 #added
                     language = course_info[2]
                     name_j = name_term[1]
                     name_e = name_term[0]
@@ -91,7 +93,7 @@ def extract_courses(page_soup):
                     else:
                         credit = credit_text[1]
 
-                    courses.append((status, registration_no, term, course_no, major, level, language,
+                    courses.append((status, registration_no, term, academic_year, course_no, major, level, language,
                                         name_j, name_e, period, room, instructor, credit))
     return courses
 
@@ -113,12 +115,9 @@ def click_next_page(current_page):
         elif link.text.strip() == "...":
             if current_page % 10 == 0:
                 next_page_button = driver.find_elements(By.LINK_TEXT, "...")[-1]
-                # if current_page // 10 > 1:
-                    # next_page_button = next_page_button[-1]
                 next_page_button.click()
                 return True
     return False
-
 
 # scratch the first page
 all_courses = []
@@ -160,26 +159,27 @@ c.execute('''
     CREATE TABLE IF NOT EXISTS courses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         status INTEGER,
-        registration_no TEXT,
-        term TEXT,
+        rgno TEXT,
+        season TEXT,
+        ay INTEGER,
         course_no TEXT,
         major TEXT,
         level TEXT,
-        language TEXT,
-        name_j TEXT,
-        name_e TEXT,
-        period TEXT,
+        lang TEXT,
+        title_j TEXT,
+        title_e TEXT,
+        schedule TEXT,
         room TEXT,
         instructor TEXT,
-        credit INTEGER
+        unit INTEGER
     )
 ''')
 
 # Insert course data into the table
 for course in all_courses:
-    c.execute('INSERT INTO courses (status, registration_no, term, course_no, major, level, language, '
-              'name_j, name_e, period, room, instructor, credit) '
-              'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', course)
+    c.execute('INSERT INTO courses (status, reno, season, ay, course_no, major, level, lang, '
+              'title_j, title_e, schedule, room, instructor, unit) '
+              'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', course)
 
 # Commit the changes and close the connection
 conn.commit()
