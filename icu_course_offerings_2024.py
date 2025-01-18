@@ -177,7 +177,7 @@ c.execute('''
 
 # Insert course data into the table
 for course in all_courses:
-    c.execute('INSERT INTO courses (status, reno, season, ay, course_no, major, level, lang, '
+    c.execute('INSERT INTO courses (status, rgno, season, ay, course_no, major, level, lang, '
               'title_j, title_e, schedule, room, instructor, unit) '
               'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', course)
 
